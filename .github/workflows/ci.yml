@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      # GitHub-hosted runners ship a stable Rust toolchain already; no third-party
+      # action is needed for a crate this small, and a public repo should not ask
+      # every clone to trust one.
+      - run: rustc --version && cargo --version
+      - run: cargo test --all
+      - run: cargo build --release
+      - name: smoke test the built binary
+        shell: bash
+        run: |
+          bin=./target/release/rafale
+          [ -f "$bin.exe" ] && bin="$bin.exe"
+          "$bin" fixtures/sample --no-color --format csv | grep -q "dead code,high,ghost_one"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rafale-${{ matrix.os }}
+          path: |
+            target/release/rafale
+            target/release/rafale.exe
+          if-no-files-found: warn
